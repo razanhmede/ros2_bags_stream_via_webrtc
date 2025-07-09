@@ -1,0 +1,11 @@
+{
+  "name": "web-data-channel-client",
+  "version": "1.0.0",
+  "description": "This example shows how to use the JavaScript library to create a client that communicates with another one by a WebRTC data channel.",
+  "main": "client.js",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "author": "",
+  "license": "ISC"
+}

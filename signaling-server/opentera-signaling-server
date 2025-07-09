@@ -1,0 +1,7 @@
+#! /usr/bin/env python3.8
+
+from opentera_webrtc.signaling_server.signaling_server import main
+
+
+if __name__ == '__main__':
+    main()

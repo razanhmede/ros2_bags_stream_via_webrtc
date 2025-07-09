@@ -1,0 +1,3 @@
+sphinx==6.1.3
+pybind11-stubgen==0.12.0
+build==0.10.0
