@@ -9,7 +9,7 @@ find_package(ament_cmake REQUIRED)
 find_package(rclcpp REQUIRED)
 find_package(sensor_msgs REQUIRED)
 find_package(cv_bridge REQUIRED)
-find_package(OpenCV REQUIRED)
+find_package(OpenCV REQUIRED COMPONENTS core imgproc highgui videoio)
 find_package(rosbag2_cpp REQUIRED)
 find_package(rcl_interfaces REQUIRED)
 find_package(PCL REQUIRED COMPONENTS io)
@@ -40,13 +40,15 @@ ament_target_dependencies(CppVideoStreamClient
     rcl_interfaces
     pcl_conversions
     nav_msgs
-  
 )
 
 target_link_libraries(CppVideoStreamClient
     OpenteraWebrtcNativeClient
     opencv_videoio
     opencv_highgui
+    ${OpenCV_LIBS}
+    ${OPENNI_LIBRARY}
+    ${OPENNI2_LIBRARY}
     ${PCL_LIBRARIES}
 )
 
@@ -57,7 +59,7 @@ if (NOT WIN32)
 endif()
 
 if (NOT OPENTERA_WEBRTC_USE_SYSTEM_OPENCV)
-    add_dependencies(CppVideoStreamClient opencv_highgui opencv_videoio cv_bridge ${PCL_LIBRARIES})
+    add_dependencies(CppVideoStreamClient opencv_highgui opencv_videoio)
 endif()
 
 set_property(TARGET CppVideoStreamClient PROPERTY CXX_STANDARD 17)
