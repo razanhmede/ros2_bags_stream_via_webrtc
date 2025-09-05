@@ -33,7 +33,7 @@ class TopicVideoSource : public VideoSource, public rclcpp::Node {
   bool got_front = false, got_rear = false;
 
   // Subs
-  rclcpp::Subscription<sensor_msgs::msg::CompressedImage>::SharedPtr color_sub_;
+  rclcpp::Subscription<sensor_msgs::msg::Image>::SharedPtr color_sub_;
   rclcpp::Subscription<sensor_msgs::msg::Image>::SharedPtr depth_sub_;
   rclcpp::Subscription<sensor_msgs::msg::PointCloud2>::SharedPtr
       lidar_front_sub_;
