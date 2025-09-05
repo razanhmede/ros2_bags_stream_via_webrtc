@@ -1,0 +1,4 @@
+Name: nlohmann_json
+Description: JSON for Modern C++
+Version: 3.11.3
+Cflags: -I/home/razanh/Inmind/WebRTC/ros2_bags_stream_via_webrtc/opentera-webrtc-native-client/dist/Release/opentera-webrtc-native-client-NOTFOUND.NOTFOUND.NOTFOUND/include

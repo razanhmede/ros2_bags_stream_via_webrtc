@@ -1,0 +1,15 @@
+{
+  "rootdir": "/home/razanh/Inmind/WebRTC/ros2_bags_stream_via_webrtc/opentera-webrtc-native-client/3rdParty/opencv",
+  "modules": [
+    { "name": "core", "location": "modules/core" },
+    { "name": "imgproc", "location": "modules/imgproc" },
+    { "name": "imgcodecs", "location": "modules/imgcodecs" },
+    { "name": "videoio", "location": "modules/videoio" },
+    { "name": "highgui", "location": "modules/highgui" }
+  ],
+  "files_remap": [
+    { "src": "modules/java/generator/android/java/org/opencv/android/OpenCVLoader.java.in", "target": "/home/razanh/Inmind/WebRTC/ros2_bags_stream_via_webrtc/build/opentera-webrtc-native-client/3rdParty/opencv/configured/modules/java/generator/android/java/org/opencv/android/OpenCVLoader.java" },
+    { "src": "modules/java/generator/src/java/org/opencv/osgi/OpenCVNativeLoader.java.in", "target": "/home/razanh/Inmind/WebRTC/ros2_bags_stream_via_webrtc/build/opentera-webrtc-native-client/3rdParty/opencv/configured/modules/java/generator/src/java/org/opencv/osgi/OpenCVNativeLoader.java" },
+    { "src": "modules/core/misc/java/src/java/core+Core.jcode.in", "target": "/home/razanh/Inmind/WebRTC/ros2_bags_stream_via_webrtc/build/opentera-webrtc-native-client/3rdParty/opencv/configured/modules/core/misc/java/src/java/core+Core.jcode" }
+  ]
+}

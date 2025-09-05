@@ -52,16 +52,15 @@ public:
     {
       rclcpp::QoS qos(rclcpp::KeepLast(5));
       qos.best_effort();
-      color_sub_ = create_subscription<sensor_msgs::msg::CompressedImage>(
-          "/robot_interface/front_camera/color/resize/image_raw/compressed",
+      color_sub_ = create_subscription<sensor_msgs::msg::Image>(
+          "/robot_interface/front_camera/color/image_raw",
           qos, std::bind(&TopicVideoSource::colorCallback, this, _1));
     }
     {
       rclcpp::QoS qos(rclcpp::KeepLast(5));
       qos.best_effort();
       depth_sub_ = create_subscription<sensor_msgs::msg::Image>(
-          "/robot_interface/front_camera/depth/resize/image_rect_raw/"
-          "compressedDepth",
+          "/robot_interface/front_camera/depth/image_rect_raw",
           qos, std::bind(&TopicVideoSource::depthCallback, this, _1));
     }
     {
@@ -155,10 +154,9 @@ public:
   }
 
   // ---- Callbacks ----
-  void colorCallback(const sensor_msgs::msg::CompressedImage::SharedPtr msg) {
-    color_image = cv::imdecode(cv::Mat(msg->data), cv::IMREAD_COLOR);
-  }
-
+    void colorCallback(const sensor_msgs::msg::Image::SharedPtr msg) {
+    color_image = cv_bridge::toCvCopy(msg, sensor_msgs::image_encodings::BGR8)->image;
+}
   void depthCallback(const sensor_msgs::msg::Image::SharedPtr msg) {
     cv::Mat raw_image = cv_bridge::toCvCopy(msg)->image;
     if (raw_image.type() == CV_32FC1) {

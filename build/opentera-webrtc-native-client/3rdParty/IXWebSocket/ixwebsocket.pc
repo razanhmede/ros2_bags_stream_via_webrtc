@@ -1,0 +1,11 @@
+prefix=/home/razanh/Inmind/WebRTC/ros2_bags_stream_via_webrtc/opentera-webrtc-native-client/dist/Release/opentera-webrtc-native-client-NOTFOUND.NOTFOUND.NOTFOUND
+exec_prefix=${prefix}
+libdir=${exec_prefix}/lib
+includedir=${prefix}/include
+
+Name: ixwebsocket
+Description: websocket and http client and server library, with TLS support and very few dependencies
+Version: 
+Libs: -L${libdir} -lixwebsocket
+Cflags: -I${includedir}
+Requires: openssl

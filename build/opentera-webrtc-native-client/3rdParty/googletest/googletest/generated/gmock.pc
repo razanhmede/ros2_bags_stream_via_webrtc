@@ -1,0 +1,10 @@
+libdir=/home/razanh/Inmind/WebRTC/ros2_bags_stream_via_webrtc/opentera-webrtc-native-client/dist/Release/opentera-webrtc-native-client-NOTFOUND.NOTFOUND.NOTFOUND/lib
+includedir=/home/razanh/Inmind/WebRTC/ros2_bags_stream_via_webrtc/opentera-webrtc-native-client/dist/Release/opentera-webrtc-native-client-NOTFOUND.NOTFOUND.NOTFOUND/include
+
+Name: gmock
+Description: GoogleMock (without main() function)
+Version: 1.14.0
+URL: https://github.com/google/googletest
+Requires: gtest = 1.14.0
+Libs: -L${libdir} -lgmock 
+Cflags: -I${includedir} -DGTEST_HAS_PTHREAD=1
