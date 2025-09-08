@@ -1,3 +1,4 @@
+cat main.cpp
 #include <OpenteraWebrtcNativeClient/StreamClient.h>
 
 #include <cv_bridge/cv_bridge.hpp>
@@ -19,14 +20,14 @@
 #include <memory>
 #include <string>
 #include <thread>
-
+#include <mutex>
 using namespace opentera;
 using namespace std::chrono_literals;
 
 class TopicVideoSource : public VideoSource, public rclcpp::Node {
   std::atomic_bool m_stopped;
   std::thread m_thread;
-
+  std::mutex mtx_;
   // Buffers
   cv::Mat color_image, depth_colormap, map_image;
   cv::Mat lidar_front_img, lidar_rear_img;
@@ -80,6 +81,7 @@ public:
     {
       rclcpp::QoS qos(rclcpp::KeepLast(1));
       qos.reliable();
+      qos.transient_local();
       map_sub_ = create_subscription<nav_msgs::msg::OccupancyGrid>(
           "/map", qos, std::bind(&TopicVideoSource::mapCallback, this, _1));
     }
@@ -155,31 +157,61 @@ public:
 
   // ---- Callbacks ----
     void colorCallback(const sensor_msgs::msg::Image::SharedPtr msg) {
-    color_image = cv_bridge::toCvCopy(msg, sensor_msgs::image_encodings::BGR8)->image;
+     cv::Mat img = cv_bridge::toCvCopy(
+      msg, sensor_msgs::image_encodings::BGR8)->image;
+  std::lock_guard<std::mutex> lk(mtx_);
+  color_image = std::move(img);
 }
   void depthCallback(const sensor_msgs::msg::Image::SharedPtr msg) {
-    cv::Mat raw_image = cv_bridge::toCvCopy(msg)->image;
-    if (raw_image.type() == CV_32FC1) {
-      cv::Mat normalized;
-      cv::normalize(raw_image, normalized, 0, 255, cv::NORM_MINMAX, CV_8UC1);
-      cv::applyColorMap(normalized, depth_colormap, cv::COLORMAP_JET);
-    }
+     cv::Mat raw = cv_bridge::toCvCopy(msg)->image;  // don't force encoding; detect
+
+  cv::Mat normalized;
+
+  if (raw.type() == CV_32FC1) {
+    cv::Mat no_nan = raw.clone();
+    cv::patchNaNs(no_nan, 0.f);
+    cv::normalize(no_nan, normalized, 0, 255, cv::NORM_MINMAX, CV_8UC1);
+  }
+  else if (raw.type() == CV_16UC1) {
+    // Assume mm. Clip/scale for display; tweak max_mm to your scene.
+    const double max_mm = 5000.0;
+    cv::Mat clipped = raw.clone();
+    clipped.setTo(max_mm, clipped == 0);                // treat 0 as "no return"
+    clipped.convertTo(normalized, CV_8UC1, 255.0/max_mm);
+    cv::bitwise_not(normalized, normalized);            // nearer = brighter (optional)
+  }
+  else {
+    return; // unsupported depth type
+  }
+
+  cv::Mat cm;
+  cv::applyColorMap(normalized, cm, cv::COLORMAP_JET);
+
+  std::lock_guard<std::mutex> lk(mtx_);
+  depth_colormap = std::move(cm);
+    
   }
 
   void lidarFrontCallback(const sensor_msgs::msg::PointCloud2::SharedPtr msg) {
-    lidar_front_img.setTo(cv::Scalar(0, 0, 0));
-    drawPointCloudOnSharedImage(msg, lidar_front_img, cv::Scalar(0, 255, 0));
-    got_front = true;
+  cv::Mat img(500, 500, CV_8UC3, cv::Scalar(0, 0, 0));
+  drawPointCloudOnSharedImage(msg, img, cv::Scalar(0, 255, 0));
+  std::lock_guard<std::mutex> lk(mtx_);
+  lidar_front_img = std::move(img);
+  got_front= true;
   }
 
   void lidarRearCallback(const sensor_msgs::msg::PointCloud2::SharedPtr msg) {
-    lidar_rear_img.setTo(cv::Scalar(0, 0, 0));
-    drawPointCloudOnSharedImage(msg, lidar_rear_img, cv::Scalar(0, 0, 255));
-    got_rear = true;
+    cv::Mat img(500, 500, CV_8UC3, cv::Scalar(0, 0, 0));
+  drawPointCloudOnSharedImage(msg, img, cv::Scalar(0, 0, 255));
+  std::lock_guard<std::mutex> lk(mtx_);
+  lidar_rear_img = std::move(img);
+  got_rear = true;
   }
 
   void mapCallback(const nav_msgs::msg::OccupancyGrid::SharedPtr msg) {
-    map_image = occupancyGridToImage(msg);
+   cv::Mat img = occupancyGridToImage(msg);
+   std::lock_guard<std::mutex> lk(mtx_);
+   map_image = std::move(img);
   }
 
 private:
@@ -191,57 +223,71 @@ private:
 
       // if (!color_image.empty() && !depth_colormap.empty() && got_front &&
       // got_rear)
-      if (!color_image.empty() && got_front && got_rear) {
+        cv::Mat color,depth,map,lidar_f,lidar_r;
+        bool have_front=false, have_rear=false;
+         {
+        std::lock_guard<std::mutex> lk(mtx_);
+        if (!color_image.empty())      color   = color_image.clone();
+        if (!depth_colormap.empty())   depth   = depth_colormap.clone();
+        if (!map_image.empty())        map     = map_image.clone();
+        if (!lidar_front_img.empty())  { lidar_f = lidar_front_img.clone(); have_front = got_front; }
+        if (!lidar_rear_img.empty())   { lidar_r = lidar_rear_img.clone();  have_rear  = got_rear;  }
+      }
         // Labels
-        cv::putText(color_image, "RGB", {10, color_image.rows - 10},
+        if(!color.empty() && have_front && have_rear){
+        cv::putText(color, "RGB", {10, color.rows - 10},
                     cv::FONT_HERSHEY_SIMPLEX, 1, cv::Scalar(255, 255, 255), 2);
-        // cv::putText(depth_colormap, "Depth", {10, 30},
-        // cv::FONT_HERSHEY_SIMPLEX, 1, cv::Scalar(255,255,255), 2);
-        cv::putText(lidar_front_img, "LiDAR Front", {10, 30},
-                    cv::FONT_HERSHEY_SIMPLEX, 1, cv::Scalar(0, 255, 0), 2);
-        cv::putText(lidar_rear_img, "LiDAR Rear", {10, 30},
-                    cv::FONT_HERSHEY_SIMPLEX, 1, cv::Scalar(0, 0, 255), 2);
+         //cv::putText(depth, "Depth", {10, 30},
+           //         cv::FONT_HERSHEY_SIMPLEX, 1, cv::Scalar(255,255,255), 2);
+       // cv::putText(lidar_f, "LiDAR Front", {10, 30},
+    //                cv::FONT_HERSHEY_SIMPLEX, 1, cv::Scalar(0, 255, 0), 2);
+       // cv::putText(lidar_r, "LiDAR Rear", {10, 30},
+      //              cv::FONT_HERSHEY_SIMPLEX, 1, cv::Scalar(0, 0, 255), 2);
 
         // Padding
         int pad = 10;
         cv::Mat padded_color, padded_depth, padded_map;
         cv::Mat padded_lidar_front, padded_lidar_rear;
-
+        cv::Mat depth_resized, lidar_f_resized, lidar_r_resized, map_resized;
         // Resize
-        if (!depth_colormap.empty()) {
-          cv::resize(depth_colormap, depth_colormap, color_image.size());
-          cv::putText(depth_colormap, "Depth", {10, 30},
+        if (!depth.empty()) {
+          cv::resize(depth, depth_resized, color.size());
+          cv::putText(depth_resized, "Depth", {10, 30},
                       cv::FONT_HERSHEY_SIMPLEX, 1, cv::Scalar(255, 255, 255),
                       2);
-          cv::copyMakeBorder(depth_colormap, padded_depth, 0, 0, 0, pad,
+          cv::copyMakeBorder(depth_resized, padded_depth, 0, 0, 0, pad,
                              cv::BORDER_CONSTANT);
         } else {
           // Create a placeholder image with "No Depth"
-          padded_depth = cv::Mat(color_image.rows, color_image.cols + pad,
+          padded_depth = cv::Mat(color.rows, color.cols + pad,
                                  CV_8UC3, cv::Scalar(50, 50, 50));
           cv::putText(padded_depth, "No Depth", {10, 30},
                       cv::FONT_HERSHEY_SIMPLEX, 1, cv::Scalar(200, 200, 200),
                       2);
         }
 
-        cv::resize(lidar_front_img, lidar_front_img, color_image.size());
-        cv::resize(lidar_rear_img, lidar_rear_img, color_image.size());
+        cv::resize(lidar_f, lidar_f_resized, color.size());
+        cv::resize(lidar_r, lidar_r_resized, color.size());
+        cv::putText(lidar_f_resized, "LiDAR Front", {10, 30},
+                    cv::FONT_HERSHEY_SIMPLEX, 1, cv::Scalar(0, 255, 0), 2);
+        cv::putText(lidar_r_resized, "LiDAR Rear", {10, 30},
+                    cv::FONT_HERSHEY_SIMPLEX, 1, cv::Scalar(0, 0, 255), 2);
 
-        cv::copyMakeBorder(color_image, padded_color, 0, 0, 0, pad,
+        cv::copyMakeBorder(color, padded_color, 0, 0, 0, pad,
                            cv::BORDER_CONSTANT);
         // cv::copyMakeBorder(depth_colormap, padded_depth, 0, 0, 0, pad,
         // cv::BORDER_CONSTANT);
-        cv::copyMakeBorder(lidar_front_img, padded_lidar_front, 0, 0, 0, pad,
+        cv::copyMakeBorder(lidar_f_resized, padded_lidar_front, 0, 0, 0, pad,
                            cv::BORDER_CONSTANT);
-        cv::copyMakeBorder(lidar_rear_img, padded_lidar_rear, 0, 0, 0, pad,
+        cv::copyMakeBorder(lidar_r_resized, padded_lidar_rear, 0, 0, 0, pad,
                            cv::BORDER_CONSTANT);
 
-        if (!map_image.empty()) {
-          cv::resize(map_image, map_image, color_image.size());
+        if (!map.empty()) {
+          cv::resize(map, map_resized, color.size());
 
-          cv::putText(map_image, "Map", {10, 30}, cv::FONT_HERSHEY_SIMPLEX, 1,
+          cv::putText(map_resized, "Map", {10, 30}, cv::FONT_HERSHEY_SIMPLEX, 1,
                       cv::Scalar(255, 255, 255), 2);
-          cv::copyMakeBorder(map_image, padded_map, 0, 0, 0, pad,
+          cv::copyMakeBorder(map_resized, padded_map, 0, 0, 0, pad,
                              cv::BORDER_CONSTANT);
         }
 
@@ -286,14 +332,14 @@ int main(int argc, char *argv[]) {
   rclcpp::init(argc, argv);
 
   std::vector<IceServer> iceServers;
-  if (!IceServer::fetchFromServer("http://10.200.30.146:3001/iceservers", "abc",
+  if (!IceServer::fetchFromServer("http://192.168.1.11:8080/iceservers", "abc",
                                   iceServers)) {
     std::cout << "IceServer::fetchFromServer failed" << std::endl;
     iceServers.clear();
   }
 
   auto signalingServerConfiguration = SignalingServerConfiguration::create(
-      "ws://10.200.30.146:3001/signaling", "CppClient", "chat", "abc");
+      "ws://192.168.1.11:8080/signaling", "CppClient", "chat", "abc");
 
   auto webrtcConfiguration = WebrtcConfiguration::create(iceServers);
   auto videoStreamConfiguration = VideoStreamConfiguration::create();
@@ -366,3 +412,4 @@ int main(int argc, char *argv[]) {
   rclcpp::shutdown();
   return 0;
 }
+
