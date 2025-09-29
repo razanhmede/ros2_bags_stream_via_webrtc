@@ -3,34 +3,20 @@
   <head>
     <meta charset="utf-8" />
     <title>Web Data Channel Client (Direct-to-Client)</title>
-
-    <!-- Must be served and load with HTTP 200 -->
     <script src="./openteraWebrtcWebClient.js"></script>
-
     <script>
-      // ---- Config (adjust signaling as needed) ----
       const HOST = location.hostname;
       const WS_PROTO = (location.protocol === 'https:') ? 'wss' : 'ws';
-      // Use your fixed signaling host as requested:
       window.SIGNALING_URL = `ws://424-iwhub.idealworks.com:8081/signaling`;
-
-      
       const ICE_SERVERS_URL = './iceServers.json';
-
-      const TOPIC_CMD     = "/cockpit/cmd_vel";
-      const TOPIC_ACTIVE  = "/navigation/active_sender";
-      const TOPIC_CONNECT = "/cockpit/connect";
-      const SENDER_NAME   = "web_wasd";
-
-      // WASD parameters
+      const TOPIC_CMD = "/dev_web_ui/cmd_vel";
+      const TOPIC_CONNECT = "/dev_web_ui/connect";
+      const SENDER_NAME = "dev_web_ui";
       const LIN_SPEED = 2, ANG_SPEED = 1.0, RATE_HZ = 20;
       const periodMs = Math.max(10, 1000 / RATE_HZ);
-
-      // Expose keys so the on-screen buttons can poke it
       window.keys = { w:0, a:0, s:0, d:0 };
-
-      let dataChannelClient = null;
       let wasdTimer = null;
+      let lastKeepalive = 0;
 
       function anyKeyDown(){ return keys.w || keys.a || keys.s || keys.d; }
       function computeCmd(){
@@ -38,7 +24,6 @@
         const wz = (keys.a - keys.d) * ANG_SPEED;
         return { vx, vy: 0, wz };
       }
-
       function dc(){
         return (window.__dc && window.__dc.readyState === 'open') ? window.__dc : null;
       }
@@ -48,34 +33,18 @@
         ch.send(str);
         const out = document.getElementById('last_sent'); if (out) out.textContent = str;
       }
-
-      // ROSBridge-like publish messages (so the C++ client can parse simply)
-      function twist(linearX=0, linearY=0, angularZ=0){
-        return {
-          op: "publish",
-          topic: TOPIC_CMD,
-          type: "geometry_msgs/msg/Twist",
-          msg: { linear: { x: linearX, y: linearY, z: 0 }, angular: { x: 0, y: 0, z: angularZ } }
-        };
-      }
-      function msgActive(active){
-        return {
-          op: "publish",
-          topic: TOPIC_ACTIVE,
-          type: "std_msgs/msg/String",
-          msg: { active: !!active, sender: SENDER_NAME } // C++ side stringifies this JSON into std_msgs/String.data
-        };
+      function twist(x=0, y=0, z=0){
+        return { op:"publish", topic:TOPIC_CMD, type:"geometry_msgs/msg/Twist", msg:{ linear:{x,y,z:0}, angular:{x:0,y:0,z:z} } };
       }
       function msgConnect(connected){
-        return {
-          op: "publish",
-          topic: TOPIC_CONNECT,
-          type: "std_msgs/msg/Bool",
-          msg: !!connected
-        };
+        return { op:"publish", topic:TOPIC_CONNECT, type:"std_msgs/msg/Bool", msg:!!connected };
       }
-
       function tick(){
+        const now = Date.now();
+        if (now - lastKeepalive > 1000) {
+          dcSend(msgConnect(true));
+          lastKeepalive = now;
+        }
         const { vx, vy, wz } = computeCmd();
         dcSend(twist(vx, vy, wz));
       }
@@ -83,10 +52,9 @@
       function stopLoop(){
         if (!wasdTimer) return;
         clearInterval(wasdTimer); wasdTimer = null;
-        // Send a stop immediately
         dcSend(twist(0,0,0));
+        dcSend(msgConnect(false));
       }
-
       async function loadIceServers() {
         try {
           const res = await fetch(ICE_SERVERS_URL, { cache: 'no-store' });
@@ -95,11 +63,9 @@
           if (!Array.isArray(iceServers)) throw new Error('iceServers.json must be a JSON array.');
           return iceServers;
         } catch (err) {
-          console.warn('ICE: using empty list. Reason:', err);
           return [];
         }
       }
-
       function wireClientUI(client){
         const nameInput = document.getElementById('name_input');
         const passwordInput = document.getElementById('password_input');
@@ -120,24 +86,16 @@
         function updateDcStatus(){
           dcStatus.textContent = (window.__dc ? window.__dc.readyState : 'none');
         }
-
-        client.onSignalingConnectionOpen = () => {
-          connectButton.disabled = true;
-          closeButton.disabled = false;
-        };
+        client.onSignalingConnectionOpen = () => { connectButton.disabled = true; closeButton.disabled = false; };
         client.onSignalingConnectionClose = () => {
-          connectButton.disabled = false;
-          closeButton.disabled = true;
-          callAllButton.disabled = true;
-          hangUpAllButton.disabled = true;
-          closeAllRoomPeerConnectionsButton.disabled = true;
-          callOneButton.disabled = true;
+          connectButton.disabled = false; closeButton.disabled = true;
+          callAllButton.disabled = true; hangUpAllButton.disabled = true; closeAllRoomPeerConnectionsButton.disabled = true; callOneButton.disabled = true;
+          stopLoop();
         };
         client.onSignalingConnectionError = (message) => { alert(message); };
         client.onRoomClientsChange = (clients) => {
           callAllButton.disabled = !(clients.length > 1 && hangUpAllButton.disabled);
           callOneButton.disabled = callAllButton.disabled;
-
           clientList.innerHTML = '';
           clients.forEach((c) => {
             const li = document.createElement('li');
@@ -148,50 +106,33 @@
         };
         client.callAcceptor = async (id, name) => confirm('Do you accept the call from ' + name + '?');
         client.onCallReject = (id, name) => { alert('The call is rejected (' + name + ')'); };
-        client.onClientConnectionFail = (id, name) => { console.log('Connect to ' + name + ' (' + id + ') failed.'); };
+        client.onClientConnectionFail = (id, name) => { };
         client.onDataChannelOpen = () => {
           sendButton.disabled = false;
-          callAllButton.disabled = true;
-          hangUpAllButton.disabled = false;
-          closeAllRoomPeerConnectionsButton.disabled = false;
-          callOneButton.disabled = true;
+          callAllButton.disabled = true; hangUpAllButton.disabled = false; closeAllRoomPeerConnectionsButton.disabled = false; callOneButton.disabled = true;
+          updateDcStatus();
+          if (enableEl.checked) { lastKeepalive = 0; startLoop(); }
         };
         client.onDataChannelClose = () => {
           sendButton.disabled = !client.isRtcConnected;
-          callAllButton.disabled = client.isRtcConnected;
-          hangUpAllButton.disabled = !client.isRtcConnected;
-          closeAllRoomPeerConnectionsButton.disabled = !client.isRtcConnected;
-          callOneButton.disabled = client.isRtcConnected;
+          callAllButton.disabled = client.isRtcConnected; hangUpAllButton.disabled = !client.isRtcConnected; closeAllRoomPeerConnectionsButton.disabled = !client.isRtcConnected; callOneButton.disabled = client.isRtcConnected;
+          updateDcStatus();
+          stopLoop();
         };
         client.onDataChannelMessage = (id, name, _data, message) => {
           chatTextArea.value += `${id} - ${name}: ${message}\n`;
           chatTextArea.scrollTop = chatTextArea.scrollHeight;
         };
-
-        // Hook created data channels to track status + print received JSON
         (function hookAllDataChannels() {
           function attach(dc){
             window.__dc = dc;
             const _send = dc.send.bind(dc);
-            dc.send = (data)=>{
-              try { console.log('[DC send]', JSON.parse(data)); }
-              catch { console.log('[DC send]', data); }
-              _send(data);
-            };
-            dc.addEventListener('message', ev => {
-              try { console.log('[DC recv]', JSON.parse(ev.data)); }
-              catch { console.log('[DC recv]', ev.data); }
-            });
+            dc.send = (data)=>{ try { JSON.parse(data); } catch {} _send(data); };
+            dc.addEventListener('message', ev => {});
             dc.onopen  = updateDcStatus;
             dc.onclose = updateDcStatus;
             updateDcStatus();
-
-            // If you ever want odom later, you could ask the C++ side to stream it:
-            // dc.addEventListener('open', () => {
-            //   dc.send(JSON.stringify({ op: 'subscribe', topic: '/robot_interface/odom' }));
-            // });
           }
-
           const origCreate = RTCPeerConnection.prototype.createDataChannel;
           RTCPeerConnection.prototype.createDataChannel = function(label, opts){
             const dc = origCreate.call(this, label, opts);
@@ -200,27 +141,15 @@
           };
           const desc = Object.getOwnPropertyDescriptor(RTCPeerConnection.prototype, 'ondatachannel');
           Object.defineProperty(RTCPeerConnection.prototype, 'ondatachannel', {
-            set(fn){
-              return desc.set.call(this, ev => { attach(ev.channel); fn && fn(ev); });
-            }
+            set(fn){ return desc.set.call(this, ev => { attach(ev.channel); fn && fn(ev); }); }
           });
         })();
-
-        // UI: Connect / Close
-        connectButton.onclick = async () => {
-          try { await client.connect(); }
-          catch (err) {
-            console.error('Failed to connect:', err);
-            alert('Failed to connect to signaling server.\n' + err.message);
-          }
-        };
+        connectButton.onclick = async () => { try { await client.connect(); } catch (err) { alert('Failed to connect to signaling server.\n' + err.message); } };
         closeButton.onclick = () => { try { client?.close(); } finally { clientList.innerHTML = ''; } };
         callAllButton.onclick = () => client?.callAll && client.callAll();
         hangUpAllButton.onclick = () => client?.hangUpAll && client.hangUpAll();
         closeAllRoomPeerConnectionsButton.onclick = () => client?.closeAllRoomPeerConnections && client.closeAllRoomPeerConnections();
         callOneButton.onclick = () => { const id = (idInput.value || '').trim(); if (id && client?.callIds) client.callIds([id]); };
-
-        // Manual chat, just to test DC
         sendButton.onclick = () => {
           const m = textInput.value || '';
           if (!m) return;
@@ -229,21 +158,10 @@
           chatTextArea.value += 'Me: ' + m + '\n';
           chatTextArea.scrollTop = chatTextArea.scrollHeight;
         };
-
-        // WASD enable/disable
         enableEl.addEventListener('change', () => {
-          const on = enableEl.checked;
-          if (on) {
-            dcSend(msgConnect(true));
-            dcSend(msgActive(true));
-          } else {
-            dcSend(msgActive(false));
-            dcSend(msgConnect(false));
-            stopLoop();
-          }
+          if (enableEl.checked) { lastKeepalive = 0; startLoop(); }
+          else { stopLoop(); }
         });
-
-        // Keyboard handlers
         window.addEventListener('keydown', (e) => {
           if (!enableEl.checked) return;
           const tag = (e.target && e.target.tagName) ? e.target.tagName.toLowerCase() : "";
@@ -251,31 +169,22 @@
           const k = e.key.toLowerCase();
           if (!(k in keys) || e.repeat) return;
           keys[k] = 1; e.preventDefault();
-          if (anyKeyDown()) startLoop();
+          if (wasdTimer === null) startLoop();
         }, true);
         window.addEventListener('keyup', (e) => {
           if (!enableEl.checked) return;
           const k = e.key.toLowerCase();
           if (!(k in keys)) return;
           keys[k] = 0; e.preventDefault();
-          if (!anyKeyDown()) stopLoop();
         }, true);
-        window.addEventListener('blur', () => { if (anyKeyDown()) stopLoop(); });
         window.addEventListener('beforeunload', () => {
-          try { dcSend(twist(0,0,0)); dcSend(msgActive(false)); dcSend(msgConnect(false)); } catch {}
+          try { dcSend(twist(0,0,0)); dcSend(msgConnect(false)); } catch {}
         });
-
-        // Expose helper for on-screen W/A/S/D buttons
         window.pressKey = function pressKey(k){
           if (!document.getElementById('wasd_enable').checked) return;
           keys[k] = 1; tick();
-          setTimeout(() => {
-            keys[k] = 0;
-            if (!anyKeyDown()) dcSend(twist(0,0,0));
-          }, 120);
+          setTimeout(() => { keys[k] = 0; }, 120);
         };
-
-        // Initial UI state
         closeButton.disabled = true;
         callAllButton.disabled = true;
         hangUpAllButton.disabled = true;
@@ -283,22 +192,15 @@
         callOneButton.disabled = true;
         sendButton.disabled = true;
         document.getElementById('chat_text_area').value = '';
-
-        // Connect flow button wires are already set above.
       }
-
       window.addEventListener('DOMContentLoaded', async () => {
         if (!window.openteraWebrtcWebClient) {
-          console.error('OpenTera client library not found. Check openteraWebrtcWebClient.js path.');
-          alert('OpenTera client library not found.\nCheck openteraWebrtcWebClient.js path or server.');
+          alert('OpenTera client library not found.');
           return;
         }
-
         const iceServers = await loadIceServers();
-
         const nameInput = document.getElementById('name_input');
         const passwordInput = document.getElementById('password_input');
-
         const SignalingServerConfiguration = {
           url: window.SIGNALING_URL,
           name: nameInput.value || 'web',
@@ -306,27 +208,23 @@
           room: 'chat',
           password: passwordInput.value || ''
         };
-        const DataChannelConfiguration = {};        // RTCDataChannelInit
-        const RtcConfiguration = { iceServers };    // RTCPeerConnection config
-        const logger = (...args) => console.log('[webrtc]', ...args);
-
+        const DataChannelConfiguration = {};
+        const RtcConfiguration = { iceServers, iceTransportPolicy: 'relay' };
+        const logger = (...args) => {};
         const client = new window.openteraWebrtcWebClient.DataChannelClient(
           SignalingServerConfiguration,
           DataChannelConfiguration,
           RtcConfiguration,
           logger
         );
-
         wireClientUI(client);
       });
     </script>
-
     <style>
       body { font: 14px/1.4 system-ui, sans-serif; }
       .row { display:flex; gap:.5rem; align-items:center; flex-wrap:wrap; margin:.5rem 0; }
       .keys { display:grid; grid-template-columns:repeat(3,48px); grid-template-rows:repeat(2,48px); gap:6px; user-select:none; }
-      .key  { display:flex; align-items:center; justify-content:center; width:48px; height:48px;
-              border:1px solid #bbb; border-radius:8px; background:#f7f7f7; cursor:pointer; font-weight:600; }
+      .key  { display:flex; align-items:center; justify-content:center; width:48px; height:48px; border:1px solid #bbb; border-radius:8px; background:#f7f7f7; cursor:pointer; font-weight:600; }
       .key[data-k="w"]{grid-column:2;grid-row:1}
       .key[data-k="a"]{grid-column:1;grid-row:2}
       .key[data-k="s"]{grid-column:2;grid-row:2}
@@ -337,52 +235,42 @@
       textarea { width: 520px; }
     </style>
   </head>
-
   <body>
     <h1>Web Data Channel Client</h1>
-
     <div class="row">
       <label>Name: <input id="name_input" type="text" /></label>
       <label>Password: <input id="password_input" type="text" value="abc" /></label>
-
       <div class="keys" title="Click or press keyboard">
         <div class="key" data-k="w" onclick="pressKey('w')">W</div>
         <div class="key" data-k="a" onclick="pressKey('a')">A</div>
         <div class="key" data-k="s" onclick="pressKey('s')">S</div>
         <div class="key" data-k="d" onclick="pressKey('d')">D</div>
       </div>
-
       <label><input id="wasd_enable" type="checkbox" /> Enable WASD</label>
       <span class="status">DataChannel: <span id="dc_status" class="pill">none</span></span>
     </div>
-
     <div class="row">
       <button id="connect_button" type="button">Connect</button>
       <button id="close_button"   type="button">Close</button>
     </div>
-
     <h4>Clients:</h4>
     <ul id="client_list"></ul>
-
     <div class="row">
       <button id="call_all_button" type="button">Call All</button>
       <button id="hang_up_all_button" type="button">Hang Up All</button>
       <button id="close_all_room_peer_connections" type="button">Close All Room Peer Connections</button>
     </div>
-
     <h4>Call One:</h4>
     <div class="row">
       <input id="id_input" type="text" />
       <button id="call_one_button" type="button">Call</button>
     </div>
-
     <h4>Messages (manual send):</h4>
     <div class="row">
       <input id="text_input" type="text" />
       <button id="send_button" type="button">Send</button>
     </div>
     <textarea id="chat_text_area" rows="10" cols="50" readonly></textarea>
-
     <h4>Last WASD message sent:</h4>
     <pre id="last_sent"></pre>
   </body>

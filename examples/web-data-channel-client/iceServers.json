@@ -1,10 +1,6 @@
 [
-  { "urls": ["stun:10.200.30.38:3478"] },
   {
-    "urls": [
-      "turn:10.200.30.38:3478?transport=udp",
-      "turn:10.200.30.38:3478?transport=tcp"
-    ],
+    "urls": "turn:10.200.30.38:3478?transport=udp",
     "username": "webrtc",
     "credential": "test123"
   }

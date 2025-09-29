@@ -8,31 +8,28 @@
 #include <nlohmann/json.hpp>
 #include <iostream>
 #include <string>
-#include <vector>
 #include <memory>
-#include <thread>
 
 using nlohmann::json;
 using namespace opentera;
 using namespace std;
 
-static constexpr const char* TOPIC_CMDVEL  = "/cockpit/cmd_vel";
+static constexpr const char* TOPIC_CMDVEL  = "/dev_web_ui/cmd_vel";
 static constexpr const char* TOPIC_ACTIVE  = "/navigation/active_sender";
-static constexpr const char* TOPIC_CONNECT = "/cockpit/connect";
+static constexpr const char* TOPIC_CONNECT = "/dev_web_ui/connect";
 
 class RosIo : public rclcpp::Node
 {
 public:
     RosIo() : rclcpp::Node("webrtc_ros_bridgeless")
     {
-
-        auto qos_stream  = rclcpp::QoS(rclcpp::KeepLast(10)).reliable().durability_volatile();
         auto qos_latched = rclcpp::QoS(rclcpp::KeepLast(10)).reliable().transient_local();
 
-        pub_cmd_     = create_publisher<geometry_msgs::msg::Twist>(TOPIC_CMDVEL,  qos_stream);
-        pub_active_  = create_publisher<std_msgs::msg::String>(TOPIC_ACTIVE,      qos_latched);
+        pub_cmd_     = create_publisher<geometry_msgs::msg::Twist>(TOPIC_CMDVEL,  qos_latched);
         pub_connect_ = create_publisher<std_msgs::msg::Bool>(TOPIC_CONNECT,       qos_latched);
-
+sub_active_ = create_subscription<std_msgs::msg::String>(
+            TOPIC_ACTIVE, rclcpp::QoS(1).reliable().transient_local(),
+            [this](std_msgs::msg::String::ConstSharedPtr) {});
         RCLCPP_INFO(get_logger(), "ROS pubs ready: %s, %s, %s",
                     TOPIC_CMDVEL, TOPIC_ACTIVE, TOPIC_CONNECT);
     }
@@ -66,16 +63,6 @@ public:
                 RCLCPP_WARN(get_logger(), "Twist parse error: %s", e.what());
             }
         }
-        else if (topic == TOPIC_ACTIVE) {
-            try {
-                const auto& msgj = j.at("msg");
-                std_msgs::msg::String out;
-                out.data = msgj.dump();
-                pub_active_->publish(out);
-            } catch (const std::exception& e) {
-                RCLCPP_WARN(get_logger(), "Active parse error: %s", e.what());
-            }
-        }
         else if (topic == TOPIC_CONNECT) {
             try {
                 const auto& msgj = j.at("msg");
@@ -93,8 +80,8 @@ public:
 
 private:
     rclcpp::Publisher<geometry_msgs::msg::Twist>::SharedPtr pub_cmd_;
-    rclcpp::Publisher<std_msgs::msg::String>::SharedPtr      pub_active_;
     rclcpp::Publisher<std_msgs::msg::Bool>::SharedPtr        pub_connect_;
+    rclcpp::Subscription<std_msgs::msg::String>::SharedPtr   sub_active_;
 };
 
 int main(int argc, char* argv[])
@@ -117,12 +104,6 @@ int main(int argc, char* argv[])
 
     rclcpp::init(argc, argv);
     auto ros = std::make_shared<RosIo>();
-    std::thread rosThread([&](){
-        rclcpp::executors::SingleThreadedExecutor exec;
-        exec.add_node(ros);
-        exec.spin();
-        exec.remove_node(ros);
-    });
 
     client.setOnSignalingConnectionOpened([](){ std::cout << "OnSignalingConnectionOpened\n"; });
     client.setOnSignalingConnectionClosed([](){ std::cout << "OnSignalingConnectionClosed\n"; });
@@ -165,9 +146,11 @@ int main(int argc, char* argv[])
     });
 
     client.connect();
+    while (rclcpp::ok()) {
+        rclcpp::spin_some(ros);
+    }
     std::cin.get();
 
     rclcpp::shutdown();
-    if (rosThread.joinable()) rosThread.join();
     return 0;
 }
