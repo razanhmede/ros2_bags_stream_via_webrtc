@@ -92,7 +92,7 @@ public:
     {
       rclcpp::QoS qos(rclcpp::KeepLast(1));
       qos.reliable();
-      qos.transient_local();
+      qos.durability_volatile();
       map_sub_ = create_subscription<nav_msgs::msg::OccupancyGrid>(
           "/lts_ng/map", qos,
           std::bind(&TopicVideoSource::mapCallback, this, _1));
