@@ -94,7 +94,7 @@ public:
       qos.reliable();
       qos.transient_local();
       map_sub_ = create_subscription<nav_msgs::msg::OccupancyGrid>(
-          "/map", qos,
+          "/lts_ng/map", qos,
           std::bind(&TopicVideoSource::mapCallback, this, _1));
     }
 

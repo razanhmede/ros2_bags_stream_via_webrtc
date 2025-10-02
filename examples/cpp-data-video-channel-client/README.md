@@ -1,16 +1,13 @@
-# cpp-data-channel-client
+for the map to work, we had to :
 
-This example shows how to use the C++ library to create a client that communicates with another one by a WebRTC data channel. This example should be used with [web-data-channel-client](../web-data-channel-client).
+docker exec -it iw_hub_app-ros1-ros2-bridge-1 bash
+vim config/parameter_bridge_config.yaml 
 
-## How to use
+and add : 
 
-```bash
-cd ../..
-mkdir build
-cd build
-cmake ..
-cmake --build . --config Release|Debug
 
-cd bin/Release
-./CppDataChannelClient
-```
+  topic: /lts_ng/map
+  type:  nav_msgs/msg/OccupancyGrid 
+  queue_size: 1
+
+the reason behind this change is that the map is being published on  /lts_ng/map which is a ros1 topic.
