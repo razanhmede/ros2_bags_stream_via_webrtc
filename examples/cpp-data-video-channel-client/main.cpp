@@ -220,6 +220,14 @@ public:
     lidar_rear_img = std::move(img);
     got_rear = true;
   }
+  static void safe_resize(const cv::Mat &src, cv::Mat &dst,
+                          const cv::Size &sz) {
+    if (sz.width > 0 && sz.height > 0 && !src.empty()) {
+      cv::resize(src, dst, sz);
+    } else {
+      dst = src.clone();
+    }
+  }
 
   void mapCallback(const nav_msgs::msg::OccupancyGrid::SharedPtr msg) {
     cv::Mat img = occupancyGridToImage(msg);
@@ -229,14 +237,6 @@ public:
 private:
   void run() {
     int frame_count = 0;
-    auto safe_resize = [&](const cv::Mat &src, cv::Mat &dst,
-                           const cv::Size &sz) {
-      if (sz.width > 0 && sz.height > 0 && !src.empty()) {
-        cv::resize(src, dst, sz);
-      } else {
-        dst = src.clone();
-      }
-    };
     while (rclcpp::ok() && !m_stopped) {
       // Need at least RGB + both lidars to build the mosaic
       if (color_image.empty() || !got_front.load() || !got_rear.load()) {
@@ -277,7 +277,7 @@ private:
         if (src.channels() == 1)
           cv::cvtColor(src, img, cv::COLOR_GRAY2BGR);
         if (sz.width > 0 && sz.height > 0)
-          cv::resize(img, img, sz, 0, 0, cv::INTER_NEAREST);
+          safe_resize(img, img, sz);
         cv::Mat gray, mask, out(img.size(), CV_8UC3, cv::Scalar(0, 0, 0));
         cv::cvtColor(img, gray, cv::COLOR_BGR2GRAY);
         cv::threshold(gray, mask, 1, 255, cv::THRESH_BINARY);
@@ -320,7 +320,7 @@ private:
       if (!map_image.empty() && map_image.cols > 0 && map_image.rows > 0) {
 
         cv::Mat map_resized;
-        cv::resize(map_image, map_resized, tile_sz, 0, 0, cv::INTER_NEAREST);
+        safe_resize(map_image, map_resized, tile_sz);
         cv::copyMakeBorder(map_resized, padded_map, 0, 0, 0, pad,
                            cv::BORDER_CONSTANT);
       } else {

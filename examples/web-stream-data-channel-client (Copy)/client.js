@@ -24,7 +24,6 @@ window.keys = keys;
         const ch = dc(); if (!ch) return;
         const str = (typeof obj === 'string') ? obj : JSON.stringify(obj);
         ch.send(str);
-        const out = document.getElementById('last_sent'); if (out) out.textContent = str;
       }
       function twist(x=0, y=0, z=0){
         return { op:"publish", topic:TOPIC_CMD, type:"geometry_msgs/msg/Twist", msg:{ linear:{x,y,z:0}, angular:{x:0,y:0,z:z} } };
@@ -56,14 +55,12 @@ window.keys = keys;
   let hangUpAllButton = document.getElementById('hang_up_all_button');
   let closeAllRoomPeerConnectionsButton = document.getElementById('close_all_room_peer_connections');
   let idInput = document.getElementById('id_input');
-  let callOneButton = document.getElementById('call_one_button');
   let remoteVideos = document.getElementById('remote_videos');
 
  
   callAllButton.disabled = true;
   hangUpAllButton.disabled = true;
   closeAllRoomPeerConnectionsButton.disabled = true;
-  callOneButton.disabled = true;
 
 
   let streamDataChannelClient = null;
@@ -109,7 +106,6 @@ function paintIdentity(name){
       callAllButton.disabled = true;
       hangUpAllButton.disabled = true;
       closeAllRoomPeerConnectionsButton.disabled = true;
-      callOneButton.disabled = true;
         stopLoop();
   enableEl.checked = false;
   updateDcStatus();
@@ -119,7 +115,6 @@ function paintIdentity(name){
     }
     streamDataChannelClient.onRoomClientsChange = clients => {
       callAllButton.disabled = !(clients.length > 1 && hangUpAllButton.disabled);
-      callOneButton.disabled = callAllButton.disabled;
 
       clientList.innerHTML = '';
       clients.forEach(client => {
@@ -138,7 +133,6 @@ function paintIdentity(name){
       callAllButton.disabled = true;
       hangUpAllButton.disabled = false;
       closeAllRoomPeerConnectionsButton.disabled = false;
-      callOneButton.disabled = true;
 
       let h5 = document.createElement("h5");;
       h5.innerHTML = name;
@@ -156,7 +150,6 @@ function paintIdentity(name){
       callAllButton.disabled = streamDataChannelClient.isRtcConnected;
       hangUpAllButton.disabled = !streamDataChannelClient.isRtcConnected;
       closeAllRoomPeerConnectionsButton.disabled = !streamDataChannelClient.isRtcConnected;
-      callOneButton.disabled = streamDataChannelClient.isRtcConnected;
 
       let h5 = document.getElementById('h5' + id);
       let video = document.getElementById('video' + id);
@@ -177,7 +170,6 @@ function paintIdentity(name){
       callAllButton.disabled = true;
       hangUpAllButton.disabled = false;
       closeAllRoomPeerConnectionsButton.disabled = false;
-      callOneButton.disabled = true;
       updateDcStatus();
       if (enableEl.checked) { lastKeepalive = 0; startLoop(); }
     }
@@ -250,7 +242,6 @@ closeAllRoomPeerConnectionsButton.onclick = () => {
   enableEl.checked = false;
   updateDcStatus();
 };
-  callOneButton.onclick = () => streamDataChannelClient.callIds([idInput.value]);
   
           
         enableEl.addEventListener('change', () => {
