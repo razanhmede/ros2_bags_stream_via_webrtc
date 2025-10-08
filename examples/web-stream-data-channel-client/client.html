@@ -1,55 +1,73 @@
 <!DOCTYPE html>
 <html>
   <head>
-    <title>Stream Client</title>
+    <title>WebRTC Teleop Page</title>
     <meta charset="UTF-8">
 
     <script src="openteraWebrtcWebClient.js"></script>
   </head>
+     <style>
+      body { font: 14px/1.4 system-ui, sans-serif; }
+      .row { display:flex; gap:.5rem; align-items:center; flex-wrap:wrap; margin:.5rem 0; }
+      .keys { display:grid; grid-template-columns:repeat(3,48px); grid-template-rows:repeat(2,48px); gap:6px; user-select:none; }
+      .key  { display:flex; align-items:center; justify-content:center; width:48px; height:48px; border:1px solid #bbb; border-radius:8px; background:#f7f7f7; cursor:pointer; font-weight:600; }
+      .key[data-k="w"]{grid-column:2;grid-row:1}
+      .key[data-k="a"]{grid-column:1;grid-row:2}
+      .key[data-k="s"]{grid-column:2;grid-row:2}
+      .key[data-k="d"]{grid-column:3;grid-row:2}
+      .status { font-size:12px; color:#555; }
+      .pill   { padding:.1rem .4rem; border-radius:999px; background:#f6f8fa; }
+      pre     { background:#f6f8fa; padding:.5rem; border-radius:6px; width:520px; min-height:2rem; }
+      textarea { width: 520px; }
+      #remote_videos video {
+  width: 70%;       
+  height: auto;      
+  object-fit: contain; 
+  margin: 0;
+}
+    </style>
   <body>
 
-    <h1>Stream Client</h1>
-
-    <h2>Local Stream</h2>
-    <video id="local_video" muted></video>
+    <h1>WebRTC Teleop Page</h1>
+    <h2>Joystick Control</h2>
     <br/>
-    <button id="mute_audio_button" type="button">Mute Audio</button>
-    <button id="unmute_audio_button" type="button">Unmute Audio</button>
-    <button id="mute_video_button" type="button">Mute Video</button>
-    <button id="unmute_video_button" type="button">Unmute Video</button>
+    
+    <div class="row">
+      <div class="keys" title="Click or press keyboard">
+        <div class="key" data-k="w" onclick="pressKey('w')">W</div>
+        <div class="key" data-k="a" onclick="pressKey('a')">A</div>
+        <div class="key" data-k="s" onclick="pressKey('s')">S</div>
+        <div class="key" data-k="d" onclick="pressKey('d')">D</div>
+      </div>
+      <label><input id="wasd_enable" type="checkbox" /> Enable WASD</label>
+      <span class="status">DataChannel: <span id="dc_status" class="pill">none</span></span>
+    </div>
+  
+    <div class="row">
+   
+    </div>
 
-    <h2>Remove Stream and Messages</h2>
-    <h4>Name: </h4>
-    <input id="name_input" type="text"></input>
+    <h3>Signaling Server Connection</h3>
 
-    <h4>Password: </h4>
-    <input id="password_input" type="text" value="abc"></input>
-
-    <h4>Signaling Server Connection: </h4>
-    <button id="connect_button" type="button">Connect</button>
-    <button id="close_button" type="button">Close</button>
-
-    <h4>Clients: </h4>
+    <h4>Clients</h4>
     <ul id="client_list"></ul>
 
-    <h4>Call All: </h4>
+    <h4>Call All</h4>
     <button id="call_all_button" type="button">Call All</button>
     <button id="hang_up_all_button" type="button">Hang Up All</button>
     <button id="close_all_room_peer_connections" type="button">Close All Room Peer Connections</button>
 
-    <h4>Call One: </h4>
+    <h4>Call One</h4>
     <input id="id_input" type="text"></input>
     <button id="call_one_button" type="button">Call</button>
 
-    <h4>Messages: </h4>
-    <input id="text_input" type="text"></input>
-    <button id="send_button" type="button">Send</button><br><br>
-    <textarea id="chat_text_area" rows="10" cols="50" readonly></textarea>
-
-    <h4>Remote Stream: </h4>
+    <h2>Live Robot Data</h2>
     <div id="remote_videos"></div>
-
+    <h4>Last WASD message sent:</h4>
+    <pre id="last_sent"></pre>
     <script src="client.js"></script>
 
   </body>
+
+
 </html>
