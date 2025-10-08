@@ -1,9 +1,13 @@
 cmake_minimum_required(VERSION 3.14.0)
 
-include_directories(${CMAKE_CURRENT_BINARY_DIR})
+if (UNIX AND NOT APPLE)
+    include_directories(${CMAKE_CURRENT_BINARY_DIR})
 
-project(CppVideoStreamClient)
+    project(CppVideoStreamClient)
 
+    set(LIBRARY_OUTPUT_PATH bin/${CMAKE_BUILD_TYPE})
+
+    
 set(LIBRARY_OUTPUT_PATH bin/${CMAKE_BUILD_TYPE})
 find_package(ament_cmake REQUIRED)
 find_package(rclcpp REQUIRED)
@@ -29,9 +33,8 @@ include_directories(../../opentera-webrtc-native-client/3rdParty/json/include)
 include_directories(../../opentera-webrtc-native-client/3rdParty/IXWebSocket)
 include_directories(../../opentera-webrtc-native-client/3rdParty/cpp-httplib)
 include_directories(../../opentera-webrtc-native-client/OpenteraWebrtcNativeClient/include)
-
-add_executable(CppVideoStreamClient main.cpp)
-ament_target_dependencies(CppVideoStreamClient
+    add_executable(CppVideoStreamClient main.cpp)
+    ament_target_dependencies(CppVideoStreamClient
     rclcpp
     sensor_msgs
     cv_bridge
@@ -42,7 +45,7 @@ ament_target_dependencies(CppVideoStreamClient
     nav_msgs
 )
 
-target_link_libraries(CppVideoStreamClient
+    target_link_libraries(CppVideoStreamClient
     OpenteraWebrtcNativeClient
     opencv_videoio
     opencv_highgui
@@ -50,16 +53,16 @@ target_link_libraries(CppVideoStreamClient
     ${OPENNI_LIBRARY}
     ${OPENNI2_LIBRARY}
     ${PCL_LIBRARIES}
-)
-
+    )
 if (NOT WIN32)
     target_link_libraries(CppVideoStreamClient
         pthread
     )
 endif()
 
-if (NOT OPENTERA_WEBRTC_USE_SYSTEM_OPENCV)
-    add_dependencies(CppVideoStreamClient opencv_highgui opencv_videoio)
-endif()
+    if (NOT OPENTERA_WEBRTC_USE_SYSTEM_OPENCV)
+        add_dependencies(CppVideoStreamClient opencv_highgui opencv_videoio)
+    endif()
 
-set_property(TARGET CppVideoStreamClient PROPERTY CXX_STANDARD 17)
+    set_property(TARGET CppVideoStreamClient PROPERTY CXX_STANDARD 17)
+endif()
