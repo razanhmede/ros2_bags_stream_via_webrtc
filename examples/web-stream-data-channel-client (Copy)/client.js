@@ -202,7 +202,7 @@ function paintIdentity(name){
    const { name: AUTO_NAME } = initIdentityViewer();
   async function connectNow() {
   const SignalingServerConfiguration = {
-    url: 'ws://192.168.5.206:3001/signaling',
+    url: 'ws://10.200.30.38:8081/signaling',
     name: AUTO_NAME,
     data: {},
     room: 'chat',
@@ -211,7 +211,7 @@ function paintIdentity(name){
   const StreamConfiguration = { isSendOnly: false };
   const DataChannelConfiguration = {};
   const RtcConfiguration = {
-    iceServers: [{ urls: "turn:192.168.5.206:3478?transport=udp", username: "razan", credential: "testrazan" }],
+    iceServers: [{ urls: "turn:10.200.30.38:3478?transport=udp", username: "webrtc", credential: "test123" }],
     iceTransportPolicy: "relay"
   };
   const logger = (...args) => console.log(...args);

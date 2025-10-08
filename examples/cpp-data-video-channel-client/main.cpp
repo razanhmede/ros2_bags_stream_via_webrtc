@@ -435,14 +435,12 @@ int main(int argc, char *argv[]) {
   auto videoNode = std::make_shared<TopicVideoSource>();
   auto dataNode = std::make_shared<TopicDataChannel>();
 
-  auto sigVideo = SignalingServerConfiguration::create(
-      SIGNALING_URL, "CppClient-Video", "chat", "abc");
-  auto sigData = SignalingServerConfiguration::create(
-      SIGNALING_URL, "CppClient-Data", "chat", "abc");
+  auto sig =
+      SignalingServerConfiguration::create(SIGNALING_URL, "", "chat", "abc");
 
-  StreamClient streamClient(sigVideo, webrtcCfg, videoCfg, videoNode, nullptr);
+  StreamClient streamClient(sig, webrtcCfg, videoCfg, videoNode, nullptr);
   auto dcCfg = DataChannelConfiguration::create();
-  DataChannelClient dataClient(sigData, webrtcCfg, dcCfg);
+  DataChannelClient dataClient(sig, webrtcCfg, dcCfg);
 
   streamClient.setLogger(
       [](const std::string &m) { std::cout << "[STREAM] " << m << "\n"; });
