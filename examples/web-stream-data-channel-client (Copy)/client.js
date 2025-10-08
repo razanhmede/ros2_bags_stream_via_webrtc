@@ -113,17 +113,21 @@ function paintIdentity(name){
     streamDataChannelClient.onSignalingConnectionError = message => {
       alert(message);
     }
-    streamDataChannelClient.onRoomClientsChange = clients => {
-      callAllButton.disabled = !(clients.length > 1 && hangUpAllButton.disabled);
+   streamDataChannelClient.onRoomClientsChange = clients => {
+  callAllButton.disabled = !(clients.length > 1 && hangUpAllButton.disabled);
 
-      clientList.innerHTML = '';
-      clients.forEach(client => {
-        let li = document.createElement('li');
-        li.textContent = client.name;
-        li.style.color = client.isConnected ? 'green' : 'red';
-        clientList.appendChild(li);
-      });
-    };
+  clientList.innerHTML = '';
+  clients.forEach(client => {
+    let li = document.createElement('li');
+
+    const displayName = client.name && client.name.trim() !== '' ? client.name : 'robot';
+
+    li.textContent = displayName;
+    li.style.color = client.isConnected ? 'green' : 'red';
+    clientList.appendChild(li);
+  });
+};
+
 
     streamDataChannelClient.onClientConnectionFail = (id, name, clientData) => {
       console.log('The connect with the client ' + name + '(' + id + ') failed.');
