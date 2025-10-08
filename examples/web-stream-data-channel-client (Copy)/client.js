@@ -1,4 +1,3 @@
-
 const TOPIC_CMD = "/dev_web_ui/cmd_vel";
       const TOPIC_CONNECT = "/dev_web_ui/connect";
       const SENDER_NAME = "dev_web_ui";
@@ -50,46 +49,54 @@ window.keys = keys;
         dcSend(msgConnect(false));
       }
 (function() {
-  let localVideo = document.getElementById('local_video');
-  let muteAudioButton = document.getElementById('mute_audio_button');
-  let unmuteAudioButton = document.getElementById('unmute_audio_button');
-  let muteVideoButton = document.getElementById('mute_video_button');
-  let unmuteVideoButton = document.getElementById('unmute_video_button');
-  let nameInput = document.getElementById('name_input');
-  let passwordInput = document.getElementById('password_input');
-  let connectButton = document.getElementById('connect_button');
-  let closeButton = document.getElementById('close_button');
+ 
+
   let clientList = document.getElementById('client_list');
   let callAllButton = document.getElementById('call_all_button');
   let hangUpAllButton = document.getElementById('hang_up_all_button');
   let closeAllRoomPeerConnectionsButton = document.getElementById('close_all_room_peer_connections');
   let idInput = document.getElementById('id_input');
   let callOneButton = document.getElementById('call_one_button');
-  let textInput = document.getElementById('text_input');
-  let sendButton = document.getElementById('send_button');
-  let chatTextArea = document.getElementById('chat_text_area');
   let remoteVideos = document.getElementById('remote_videos');
 
-  muteAudioButton.disabled = true;
-  unmuteAudioButton.disabled = true;
-  muteVideoButton.disabled = true;
-  unmuteVideoButton.disabled = true;
-  closeButton.disabled = true;
+ 
   callAllButton.disabled = true;
   hangUpAllButton.disabled = true;
   closeAllRoomPeerConnectionsButton.disabled = true;
   callOneButton.disabled = true;
-  sendButton.disabled = true;
+
 
   let streamDataChannelClient = null;
 
   function updateDcStatus(){
           dcStatus.textContent = (window.__dc ? window.__dc.readyState : 'none');
         }
-  window.openteraWebrtcWebClient.devices.getDefaultStream().then(stream => {
-    localVideo.srcObject = stream;
-    localVideo.autoplay = true;
-  });
+   
+const ROOM_PASSWORD = 'abc'; 
+
+function initIdentityViewer() {
+  const existing = sessionStorage.getItem('viewer_name');
+  if (existing) {
+    paintIdentity(existing);
+    return { name: existing };
+  }
+
+  const key = 'viewer_counter';
+  const current = parseInt(localStorage.getItem(key) || '0', 10);
+  const next = current + 1;
+  localStorage.setItem(key, String(next));
+
+  const name = `viewer ${next}`;
+  sessionStorage.setItem('viewer_name', name);
+  paintIdentity(name);
+  return { name };
+}
+
+function paintIdentity(name){
+  const nameBadge = document.getElementById('name_badge');
+  if (nameBadge) nameBadge.textContent = name;
+}
+
 
   function connectStreamClientEvents() {
     streamDataChannelClient.onSignalingConnectionOpen = () => {
@@ -117,7 +124,7 @@ window.keys = keys;
       clientList.innerHTML = '';
       clients.forEach(client => {
         let li = document.createElement('li');
-        li.textContent = client.id + ' - ' + client.name;
+        li.textContent = client.name;
         li.style.color = client.isConnected ? 'green' : 'red';
         clientList.appendChild(li);
       });
@@ -128,15 +135,14 @@ window.keys = keys;
     }
 
     streamDataChannelClient.onAddRemoteStream = (id, name, clientData, stream) => {
-      sendButton.disabled = false;
       callAllButton.disabled = true;
       hangUpAllButton.disabled = false;
       closeAllRoomPeerConnectionsButton.disabled = false;
       callOneButton.disabled = true;
 
       let h5 = document.createElement("h5");;
-      h5.innerHTML = id + ' - ' + name;
-      h5.id = 'h5' + id;
+      h5.innerHTML = name;
+      
 
       let video = document.createElement("video");
       video.srcObject = stream;
@@ -147,7 +153,6 @@ window.keys = keys;
       remoteVideos.appendChild(video);
     }
     let onClientDisconnect = (id, name, clientData) => {
-      sendButton.disabled = !streamDataChannelClient.isRtcConnected;
       callAllButton.disabled = streamDataChannelClient.isRtcConnected;
       hangUpAllButton.disabled = !streamDataChannelClient.isRtcConnected;
       closeAllRoomPeerConnectionsButton.disabled = !streamDataChannelClient.isRtcConnected;
@@ -177,36 +182,9 @@ window.keys = keys;
       if (enableEl.checked) { lastKeepalive = 0; startLoop(); }
     }
     streamDataChannelClient.onDataChannelClose = onClientDisconnect;
-    streamDataChannelClient.onDataChannelMessage = (id, name, clientData, message) => {
-      chatTextArea.value += id + ' - ' + name + ': ';
-      chatTextArea.value += message;
-      chatTextArea.value += '\n';
-    };
+   
   }
 
-  function updateMuteButtons() {
-    muteAudioButton.disabled = streamDataChannelClient.isLocalAudioMuted;
-    unmuteAudioButton.disabled = !streamDataChannelClient.isLocalAudioMuted;
-    muteVideoButton.disabled = streamDataChannelClient.isLocalVideoMuted;
-    unmuteVideoButton.disabled = !streamDataChannelClient.isLocalVideoMuted;
-  }
-
-  muteAudioButton.onclick = () => {
-    streamDataChannelClient.muteLocalAudio();
-    updateMuteButtons();
-  };
-  unmuteAudioButton.onclick = () => {
-    streamDataChannelClient.unmuteLocalAudio();
-    updateMuteButtons();
-  };
-  muteVideoButton.onclick = () => {
-    streamDataChannelClient.muteLocalVideo();
-    updateMuteButtons();
-  };
-  unmuteVideoButton.onclick = () => {
-    streamDataChannelClient.unmuteLocalVideo();
-    updateMuteButtons();
-  };
 
           (function hookAllDataChannels() {
           function attach(dc){
@@ -229,47 +207,35 @@ window.keys = keys;
             set(fn){ return desc.set.call(this, ev => { attach(ev.channel); fn && fn(ev); }); }
           });
         })();
-  connectButton.onclick = async () => {
-    const SignalingServerConfiguration = {
-      url: 'ws://424-iwhub.idealworks.com:8081/signaling',
-      name: nameInput.value,
-      data: {},
-      room: 'chat',
-      password: passwordInput.value
-    };
-    const StreamConfiguration = {
-      localStream: localVideo.srcObject, // Optional
-      isSendOnly: false
-    };
-
-    const DataChannelConfiguration = {}; // See: https://developer.mozilla.org/fr/docs/Web/API/RTCPeerConnection/createDataChannel#RTCDataChannelInit_dictionary
+   const { name: AUTO_NAME } = initIdentityViewer();
+  async function connectNow() {
+  const SignalingServerConfiguration = {
+    url: 'ws://192.168.5.206:3001/signaling',
+    name: AUTO_NAME,
+    data: {},
+    room: 'chat',
+    password: ROOM_PASSWORD
+  };
+  const StreamConfiguration = { isSendOnly: false };
+  const DataChannelConfiguration = {};
   const RtcConfiguration = {
-    iceServers: [
-      {
-        urls: "turn:10.200.30.38:3478?transport=udp",
-        username: "webrtc",
-        credential: "test123"
-      }
-    ],
+    iceServers: [{ urls: "turn:192.168.5.206:3478?transport=udp", username: "razan", credential: "testrazan" }],
     iceTransportPolicy: "relay"
   };
-    let logger = (...args) => console.log(...args);
+  const logger = (...args) => console.log(...args);
 
-    streamDataChannelClient = new window.openteraWebrtcWebClient.StreamDataChannelClient(SignalingServerConfiguration,
-      StreamConfiguration, DataChannelConfiguration, RtcConfiguration, logger);
-    connectStreamClientEvents();
+  streamDataChannelClient = new window.openteraWebrtcWebClient.StreamDataChannelClient(
+    SignalingServerConfiguration, StreamConfiguration, DataChannelConfiguration, RtcConfiguration, logger
+  );
+  connectStreamClientEvents();
+  await streamDataChannelClient.connect();
+}
+if (document.readyState === 'complete' || document.readyState === 'interactive') {
+  connectNow();
+} else {
+  window.addEventListener('DOMContentLoaded', connectNow);
+}
 
-    await streamDataChannelClient.connect();
-    updateMuteButtons();
-  };
-
-  closeButton.onclick = () => {
-  streamDataChannelClient.close();
-  clientList.innerHTML = '';
-  remoteVideos.innerHTML = '';
-  stopLoop();
-  enableEl.checked = false;
-};
   callAllButton.onclick = () => streamDataChannelClient.callAll();
  hangUpAllButton.onclick = () => {
   streamDataChannelClient.hangUpAll();
@@ -285,13 +251,7 @@ closeAllRoomPeerConnectionsButton.onclick = () => {
   updateDcStatus();
 };
   callOneButton.onclick = () => streamDataChannelClient.callIds([idInput.value]);
-  sendButton.onclick = () => {
-    chatTextArea.value += 'Me: ';
-    chatTextArea.value += textInput.value;
-    chatTextArea.value += '\n';
-
-    streamDataChannelClient.sendToAll(textInput.value)
-  };
+  
           
         enableEl.addEventListener('change', () => {
           if (enableEl.checked) { lastKeepalive = 0; startLoop(); }
