@@ -10,4 +10,4 @@ npm run build:umd
 cp $SCRIPT_PATH/../../opentera-webrtc-web-client/dist/openteraWebrtcWebClient.js* $SCRIPT_PATH
 
 cd $SCRIPT_PATH/../../signaling-server
-python3 opentera-signaling-server --port 8081 --password abc --ice_servers $SCRIPT_PATH/iceServers.json --static_folder $SCRIPT_PATH
+python3 opentera-signaling-server --port 3001 --password abc --ice_servers $SCRIPT_PATH/iceServers.json --static_folder $SCRIPT_PATH
